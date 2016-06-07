@@ -37,3 +37,6 @@ CREATE TABLE `times` (
 license:
 do what you want with this. no warranties. 
 if you like it and find a bug or come up with a feature - make a pull request.
+
+note:
+i know this php looks like it's from 1999 but hey it works and it's fast. plus, it's readable.
