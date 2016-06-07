@@ -23,18 +23,30 @@ if($channel === 'directmessage' || $channel === ''){
 	# functionality start
 	if($command === 'add'){
 		$args = explode(' ', $params);
+
+		# which date?
+		if(strtolower($args[0]) === 'yesterday'){
+			$date_to_add = date('Y-m-d', strtotime('yesterday'));
+			array_shift($args); #remove the word yesterday
+		}else if(seems_to_be_date($args[0])){
+			$date_to_add = $args[0];
+			array_shift($args); #remove the word containing the specific date
+		}else{
+			$date_to_add = date('Y-m-d'); #today
+		}
+
 		$args[0] = trim($args[0],'h');
 		if($hours = floatval($args[0])){
-			if(strlen($args[1]) > 2){
+			array_shift($args); #remove first word, contains the hours-value
+			if(strlen($args[0]) > 2){
 				$times = R::dispense('times');
 				$times->channel = $channel;
 				$times->user = $user;
 				$times->hours = $hours;
-				array_shift($args); #remove first word, contains the hours-value
 				$times->description = implode($args, ' ');
-				$times->created_at = date('Y-m-d');
+				$times->created_at = $date_to_add;
 				R::store($times);
-				$response = 'Added '.$hours.'h to this project for today. '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";
+				$response = 'Added '.$hours.'h to this project for '.$date_to_add.' '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";
 			}else{
 				$response = 'You need to provide some kind of description, like 8h haxxing';
 				$error = true;
@@ -45,13 +57,22 @@ if($channel === 'directmessage' || $channel === ''){
 		}
 	
 	}else if($command === 'clear'){
-		$today = date('Y-m-d');
-		$old_times = R::findAll('times',' user = ? AND channel = ? AND created_at = ?', array($user, $channel, $today));
+
+		# which date?
+		if(strtolower($params) === 'yesterday'){
+			$date_to_add = date('Y-m-d', strtotime('yesterday'));
+		}else if(seems_to_be_date($params)){
+			$date_to_add = $params;
+		}else{
+			$date_to_add = date('Y-m-d'); #today
+		}
+
+		$old_times = R::findAll('times',' user = ? AND channel = ? AND created_at = ?', array($user, $channel, $date_to_add));
 		if($old_times){
 			foreach($old_times as $old_time){
 				R::trash($old_time);
 			}
-			$response = 'Ok, cleared your day. You currently have 0 hours reported this day.';
+			$response = 'Ok, cleared your day. You currently have 0 hours reported '.$date_to_add;
 		}else{
 			$response = 'No need to clear your day, there\'s nothing there...';
 			$error = true;
@@ -62,6 +83,52 @@ if($channel === 'directmessage' || $channel === ''){
 		$csvfile = $channel."_".date('Ymdhis');
 		R::exec("SELECT created_at, user, hours, description FROM times WHERE channel = ? ORDER BY created_at, user INTO OUTFILE '".$csvpath.$csvfile.".csv' FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\n';", array($channel));
 		$response = "Download the full report for this project here:\nhttp://miscbox.earthpeople.se/timedude/csv/".$csvfile.".csv";
+
+	}else if($command === 'list'){
+
+		if((int)$params > 0){
+			$limit = $params;
+		}else{
+			$limit = 100;
+		}
+
+		$old_times = R::findAll('times',' user = ? AND channel = ? ORDER BY created_at ASC LIMIT '.$limit, array($user, $channel));
+		if($old_times){
+			foreach($old_times as $old_time){
+				$response .= $old_time->created_at;
+				$response .= ": ";
+				$response .= $old_time->description;
+				$response .= "\n";
+			}
+		}else{
+			$response = 'Nothing, nada, etc';
+			$error = true;
+		}
+
+	}else if($command === 'listall'){
+
+		if((int)$params > 0){
+			$limit = $params;
+		}else{
+			$limit = 100;
+		}
+
+		$old_times = R::findAll('times',' channel = ? ORDER BY created_at ASC LIMIT '.$limit, array($channel));
+		if($old_times){
+			foreach($old_times as $old_time){
+				$response .= $old_time->created_at;
+				$response .= ": ";
+				$response .= $old_time->user;
+				$response .= ": ";
+				$response .= $old_time->description;
+				$response .= "\n";
+			}
+		}else{
+			$response = 'Nothing, nada, etc';
+			$error = true;
+		}
+
+
 	}else if($command === 'stats'){
 		
 		$query = R::exec("SELECT user, ROUND(SUM(hours) / (SELECT SUM(hours) FROM times WHERE channel = ?) *100, 1) as percentage FROM times WHERE channel 	= ? GROUP BY user ORDER BY percentage DESC", array($channel, $channel));
@@ -140,6 +207,10 @@ function valid_time($str = ''){
 		return false;
 	}
 
+}
+
+function seems_to_be_date($date = ''){
+	return preg_match( '#^(?P<year>\d{2}|\d{4})([- /.])(?P<month>\d{1,2})\2(?P<day>\d{1,2})$#', $date, $matches ) && checkdate($matches['month'],$matches['day'],$matches['year']);
 }
 
 function random_emoji(){
