@@ -9,51 +9,89 @@ if(!isset($_POST['text'])){
 	exit(0);
 }
 
-$words = explode(' ', $_POST['text']);
+if($_POST['channel_name'] === 'directmessage' || $_POST['channel_name'] === ''){
 
-$channel = $_POST['channel_name'];
-$command = array_shift($words);
-$params = implode($words, ' ');
-$user = $_POST['user_name'];
+	$words = explode(' ', $_POST['text']);
+	$command = array_shift($words);
+	$params = implode($words, ' ');
+	$user = $_POST['user_name'];
 
-if($channel === 'directmessage' || $channel === ''){
-	echo "Hey, you can't message this bot. Use a shared channel.";
-	$error = true;
-}else{
-	# functionality start
-	if($command === 'add'){
-		$args = explode(' ', $params);
-
-		# which date?
-		if(strtolower($args[0]) === 'yesterday'){
-			$date_to_add = date('Y-m-d', strtotime('yesterday'));
-			array_shift($args); #remove the word yesterday
-		}else if(seems_to_be_date($args[0])){
-			$date_to_add = $args[0];
-			array_shift($args); #remove the word containing the specific date
-		}else{
-			$date_to_add = date('Y-m-d'); #today
-		}
-
-		$args[0] = trim($args[0],'h');
-		if($hours = floatval($args[0])){
-			array_shift($args); #remove first word, contains the hours-value
-			if(strlen($args[0]) > 2){
-				$times = R::dispense('times');
-				$times->channel = $channel;
-				$times->user = $user;
-				$times->hours = $hours;
-				$times->description = implode($args, ' ');
-				$times->created_at = $date_to_add;
-				R::store($times);
-				$response = 'Added '.$hours.'h to this project for '.$date_to_add.' '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";
-			}else{
-				$response = 'You need to provide some kind of description, like 8h haxxing';
-				$error = true;
+	if($command === 'me'){
+		$old_times = R::findAll('times',' user = ? ORDER BY created_at DESC, channel ASC LIMIT 50', array($user));
+		if($old_times){
+			foreach($old_times as $old_time){
+				$response .= $old_time->created_at.': '.$old_time->channel.' '.$old_time->hours.'h - '.$old_time->description;
+				$response .= "\n";
 			}
 		}else{
-			$response = 'You need to start with some hours, like 8h haxxing';
+			$response = 'Nothing here yo';
 			$error = true;
+		}
+	}else if($command === 'listprojects'){
+		$channels = R::findAll('channels');
+		if($channels){
+			foreach($channels as $channel){
+				$response .= '#'.$channel->channel.' ';
+			}
+		}
+	}else if($command === '' || $command === 'help'){
+		$response = help();
+	}
+	#$response = json_encode($command);
+
+	#echo "Hey, you can't message this bot. Use a shared channel.";
+	#$error = true;
+	#print_r($_POST);
+}else{
+
+	$words = explode(' ', $_POST['text']);
+	$channel = $_POST['channel_name'];
+	$command = array_shift($words);
+	$params = implode($words, ' ');
+	$user = $_POST['user_name'];
+
+	# functionality start
+	if($command === 'add'){
+
+		$is_enabled = R::findOne('channels','channel = ?', array($channel));
+		if(!$is_enabled){
+			$response = 'This is not a timedude channel!';
+			$error = true;
+		}else{
+
+			$args = explode(' ', $params);
+	
+			# which date?
+			if(strtolower($args[0]) === 'yesterday'){
+				$date_to_add = date('Y-m-d', strtotime('yesterday'));
+				array_shift($args); #remove the word yesterday
+			}else if(seems_to_be_date($args[0])){
+				$date_to_add = $args[0];
+				array_shift($args); #remove the word containing the specific date
+			}else{
+				$date_to_add = date('Y-m-d'); #today
+			}
+	
+			$args[0] = trim($args[0],'h');
+			if($hours = floatval($args[0])){
+				array_shift($args); #remove first word, contains the hours-value
+				if(strlen($args[0]) > 2){
+					$times = R::dispense('times');
+					$times->channel = $channel;
+					$times->user = $user;
+					$times->hours = $hours;
+					$times->description = implode($args, ' ');
+					$times->created_at = $date_to_add;
+					R::store($times);
+					$response = 'Added '.$hours.'h to this project for '.$date_to_add.' '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";
+				}else{
+					$response = 'You need to provide some kind of description, like 8h haxxing';
+					$error = true;
+				}
+			}else{
+				$response = 'You need to start with some hours, like 8h haxxing';
+				$error = true;
+			}
 		}
 	
 	}else if($command === 'clear'){
@@ -96,7 +134,9 @@ if($channel === 'directmessage' || $channel === ''){
 		if($old_times){
 			foreach($old_times as $old_time){
 				$response .= $old_time->created_at;
-				$response .= ": ";
+				$response .= " ";
+				$response .= $old_time->hours;
+				$response .= "h: ";
 				$response .= $old_time->description;
 				$response .= "\n";
 			}
@@ -117,7 +157,9 @@ if($channel === 'directmessage' || $channel === ''){
 		if($old_times){
 			foreach($old_times as $old_time){
 				$response .= $old_time->created_at;
-				$response .= ": ";
+				$response .= " ";
+				$response .= $old_time->hours;
+				$response .= "h: ";
 				$response .= $old_time->user;
 				$response .= ": ";
 				$response .= $old_time->description;
@@ -129,14 +171,28 @@ if($channel === 'directmessage' || $channel === ''){
 		}
 
 
-	}else if($command === 'stats'){
+	}else if($command === 'enable'){
 		
-		$query = R::exec("SELECT user, ROUND(SUM(hours) / (SELECT SUM(hours) FROM times WHERE channel = ?) *100, 1) as percentage FROM times WHERE channel 	= ? GROUP BY user ORDER BY percentage DESC", array($channel, $channel));
-		#print_R($query);
-		#$response = 'http://chart.apis.google.com/chart?chs=300x200&cht=p&chl=adam|peder|sanna&chd=t:10,20,70&chtt=This%20month';
-	
-		#$response = $query;
-	
+		$old_channel = R::findOne('channels','channel = ?', array($channel));
+		if($old_channel){
+			$response = 'Channel already enabled';
+		}else{
+			$channels = R::dispense('channels');
+			$channels->channel = $channel;
+			R::store($channels);
+			$response = 'Ok, enabled this channel';
+		}
+
+	}else if($command === 'disable'){
+		
+		$old_channel = R::findOne('channels','channel = ?', array($channel));
+		if($old_channel){
+			R::trash($old_channel);
+			$response = 'Ok, disabled this channel';
+		}else{
+			$response = 'This channel was already disabled';
+		}
+
 	}else if($command === 'reminder'){
 	
 		if(strtoupper($params) === 'OFF'){
@@ -164,10 +220,31 @@ if($channel === 'directmessage' || $channel === ''){
 			$response = 'Uh I could not understand you. Enter time, like 16:30 or OFF';
 			$error = true;
 		}
+	}else if($command === 'help'){
+		$response = help();
 	}else{
-		$response = ':paperclip: Here are the available commands: add <HOURS>, clear, export, reminder <hh:mm or OFF>';
+		$response = ':paperclip: /timedude help for man page';
 		$error = true;
 	}
+}
+
+function help(){
+	$str = "Available commands in a channel:\n";
+	$str .= "add <HOURS> i made a funny gif\n";
+	$str .= "add ".date('Y-m-d', strtotime('yesterday'))." <HOURS> i made a funny gif\n";
+	$str .= "clear (will clear your hours in this project for today)\n";
+	$str .= "export (generates a csv of the entire project)\n";
+	$str .= "list (shows your reported stuff for this project)\n";
+	$str .= "listall (shows everyones stuff for this project)\n";
+	$str .= "reminder <hh:mm or OFF>\n";
+	$str .= "enable (enabled time reporting for this channel)\n";
+	$str .= "disable (disable time reporting for this channel)\n";
+	$str .= "help\n\n";
+	$str .= "Available commands to @slackbot:\n";
+	$str .= "me (shows you all your hours reported lately)\n";
+	$str .= "listprojects (shows you all timedude projects)\n";
+	$str .= "help";
+	return $str;
 }
 
 if($error){
@@ -214,6 +291,6 @@ function seems_to_be_date($date = ''){
 }
 
 function random_emoji(){
-	$emojis = array('smile','laughing','blush','smiley','relaxed','smirk','heart_eyes','kissing_heart','kissing_closed_eyes','flushed','relieved','satisfied','grin','wink','stuck_out_tongue_winking_eye','stuck_out_tongue_closed_eyes','grinning','kissing','kissing_smiling_eyes','stuck_out_tongue','sleeping','worried','frowning','anguished','open_mouth','grimacing','confused','hushed','expressionless','unamused','sweat_smile','sweat','disappointed_relieved','weary','pensive','disappointed','confounded','fearful','cold_sweat','persevere','cry','sob','joy','astonished','scream','neckbeard','tired_face','angry','rage','triumph','sleepy','yum','mask','sunglasses','dizzy_face','imp','smiling_imp','neutral_face','no_mouth','innocent','alien','yellow_heart','blue_heart','purple_heart','heart','green_heart','broken_heart','heartbeat','heartpulse','two_hearts','revolving_hearts','cupid','sparkling_heart','sparkles','star','star2','dizzy','boom','collision','anger','exclamation','question','grey_exclamation','grey_question','zzz','weat_drops','notes','musical_note','fire','thumbsup','thumbsdown','punch','facepunch','fist','wave','hand','raised_hand','open_hands','point_up','point_down','point_left','point_right','raised_hands','pray','point_up_2','clap','muscle','metal','fu','runner','running','couple','family','two_men_holding_hands','two_women_holding_hands','dancer','dancers','ok_woman','no_good','information_desk_person','raising_hand','bride_with_veil','person_with_pouting_face','person_frowning','bow','couplekiss','couple_with_heart','massage','haircut','nail_care','boy','girl','woman','man','baby','older_woman','older_man','person_with_blond_hair','man_with_gua_pi_mao','man_with_turban','construction_worker','cop','angel','princess','smiley_cat','smile_cat','heart_eyes_cat','kissing_cat','smirk_cat','scream_cat','crying_cat_face','joy_cat','pouting_cat','japanese_ogre','japanese_goblin','see_no_evil','hear_no_evil','speak_no_evil','guardsman','skull','feet','lips','kiss','droplet','ear','eyes','nose','tongue','love_letter','rat','squirrel');
+	$emojis = array('smile','laughing','blush','smiley','heart_eyes','kissing_heart','kissing_closed_eyes','raised_hands','clap','muscle','mudderverk');
 	return ':'.$emojis[array_rand($emojis)].':';
 }

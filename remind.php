@@ -12,7 +12,7 @@ if(!in_array($weekday, array(1,2,3,4,5))){
 $reminders = R::findAll('reminders','time = ?', array($now));
 if($reminders){
 	foreach($reminders as $reminder){
-		echo file_get_contents('https://slack.com/api/chat.postMessage?token='.$slacktoken.'&channel=%40'.$reminder->user.'&link_names=1&username=Timedude&as_user=false&icon_emoji=neutral_face&text='.urlencode("It's ime to report todays hours for #").$reminder->channel);
+		echo file_get_contents('https://slack.com/api/chat.postMessage?token='.$slacktoken.'&channel=%40'.$reminder->user.'&link_names=1&username=Timedude&as_user=false&icon_emoji=neutral_face&text='.urlencode("It's time to report todays hours for #").$reminder->channel);
 		echo 1;
 		echo "\n";
 	}
