@@ -1,4 +1,6 @@
 TIMEDUDE
+http://labs.earthpeople.se/2016/10/time-tracking-via-slack/
+
 simple project time reporting for slack.
 because time reporting sucks. and this is slightly less sucky.
 
