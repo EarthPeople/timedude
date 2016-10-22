@@ -130,6 +130,16 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 
 ?>
 <h1>Timedude GUI</h1>
+<?php
+
+	$last = strtotime('-1 month');
+	$hourgroup['this'] = R::getRow('SELECT SUM(hours) as h FROM times WHERE MONTH(created_at) = '.date('m').' AND YEAR(created_at) = '.date('Y'));
+	$hourgroup['last'] = R::getRow('SELECT SUM(hours) as h FROM times WHERE MONTH(created_at) = '.date('m', $last).' AND YEAR(created_at) = '.date('Y', $last));
+?>
+<h2>Hour count</h2>
+This month: <?php echo $hourgroup['this']['h']?><br/>
+Last month: <?php echo $hourgroup['last']['h']?><br/>
+<br/>
 
 <h2>Projects</h2>
 <ul>
