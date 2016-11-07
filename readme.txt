@@ -17,10 +17,10 @@ follow along.
 
 3. if you want to enable daily reminders
  - call remind.php via cron every minute, like this:
- * * * * * /usr/bin/php "/var/www/miscbox.earthpeople.se/htdocs/timedude/remind.php"
+ * * * * * /usr/bin/php "/PATH/TO/TIMEDUDE/timedude/remind.php"
 
 4. if you want to ping users who committed stuff to a repo but didn’t report this time to time dude, add this cron too:
- 0 19 * * * /usr/bin/php "/var/www/miscbox.earthpeople.se/htdocs/timedude/remind.php"
+ 0 19 * * * /usr/bin/php "/PATH/TO/TIMEDUDE/timedude/remind.php"
 
 5. optionally password protect /gui with htpasswd.
 
