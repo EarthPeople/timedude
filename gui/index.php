@@ -31,7 +31,7 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 		echo '<table border="1">';
 		foreach($old_times as $old_time){
 ?>
-		<tr>
+		<tr<?php if($old_time->cost){ echo ' bgcolor="pink"'; }?>>
 			<td>
 				<?php echo $old_time->created_at?>
 			</td>
@@ -43,6 +43,9 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 			</td>
 			<td>
 				<?php echo $old_time->description?>
+<?php if($old_time->cost){?>
+				(COST <?php echo $old_time->cost?> SEK)	
+<?php }?>
 			</td>
 		</tr>
 <?php
@@ -59,14 +62,20 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 
 		echo "<h1>Project: ".$_GET['project']."</h1>";
 
+
 ?>
 	<table border="10">
+<?php
+	for($i=0;$i<6;$i++){
+
+?>
 		<td valign="top">
-			<h2>This month</h2>
+			<h2><?php echo date('F', strtotime('- '.$i.' months'))?></h2>
 <?php
 		$this_month = R::getAll('SELECT SUM(hours) as h, user FROM times WHERE channel = ? AND YEAR(created_at) = ? AND MONTH(created_at) = ? GROUP BY user', 
-			array($_GET['project'], date('Y'), date('m'))
+			array($_GET['project'], date('Y', mktime(0, 0, 0, date("m")-$i, 1, date("Y"))), date('m', mktime(0, 0, 0, date("m")-$i, 1, date("Y"))))
 		);
+		$total_h = 0;
 		if($this_month){
 			foreach($this_month as $user){
 				echo $user['user'].": ".$user['h']." hours";
@@ -74,26 +83,21 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 				$total_h += $user['h'];
 			}
 		}
+		echo "<br/>";
 		echo "- TOTAL: ".$total_h.' hours';
 		unset($total_h);
-?>
-	</td><td valign="top">
-		<h2>Last month</h2>
-<?php
-		$last_month = R::getAll('SELECT SUM(hours) as h, user FROM times WHERE channel = ? AND YEAR(created_at) = ? AND MONTH(created_at) = ? GROUP BY user', 
-			array($_GET['project'], date('Y', strtotime('last month')), date('m', strtotime('last month')))
+
+		$this_month_cost = R::getRow('SELECT SUM(cost) as c, user FROM times WHERE channel = ? AND YEAR(created_at) = ? AND MONTH(created_at) = ?', 
+			array($_GET['project'], date('Y', mktime(0, 0, 0, date("m")-$i, 1, date("Y"))), date('m', mktime(0, 0, 0, date("m")-$i, 1, date("Y"))))
 		);
-		if($last_month){
-			foreach($last_month as $user){
-				echo $user['user'].": ".$user['h']." hours";
-				echo "<br/>";
-				$total_h += $user['h'];
-			}
-		}
-		echo "- TOTAL: ".$total_h.' hours';
-		unset($total_h);
+		echo "<br/>";
+		echo "- COSTS: ".floatval($this_month_cost['c']).' SEK';
+
 ?>
 	</td>
+<?php
+	}
+?>
 </table>
 
 <?php
@@ -103,7 +107,8 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 		echo '<table border="1">';
 		foreach($old_times as $old_time){
 ?>
-		<tr>
+
+		<tr<?php if($old_time->cost){ echo ' bgcolor="pink"'; }?>>
 			<td>
 				<?php echo $old_time->created_at?>
 			</td>
@@ -115,6 +120,9 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 			</td>
 			<td>
 				<?php echo $old_time->description?>
+<?php if($old_time->cost){?>
+				(COST <?php echo $old_time->cost?> SEK)	
+<?php }?>
 			</td>
 		</tr>
 <?php
@@ -130,16 +138,6 @@ if(isset($_GET['view']) && $_GET['view'] == 'resources' && isset($_GET['resource
 
 ?>
 <h1>Timedude GUI</h1>
-<?php
-
-	$last = strtotime('-1 month');
-	$hourgroup['this'] = R::getRow('SELECT SUM(hours) as h FROM times WHERE MONTH(created_at) = '.date('m').' AND YEAR(created_at) = '.date('Y'));
-	$hourgroup['last'] = R::getRow('SELECT SUM(hours) as h FROM times WHERE MONTH(created_at) = '.date('m', $last).' AND YEAR(created_at) = '.date('Y', $last));
-?>
-<h2>Hour count</h2>
-This month: <?php echo $hourgroup['this']['h']?><br/>
-Last month: <?php echo $hourgroup['last']['h']?><br/>
-<br/>
 
 <h2>Projects</h2>
 <ul>

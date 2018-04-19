@@ -55,35 +55,53 @@ if($_POST['channel_name'] === 'directmessage' || $_POST['channel_name'] === ''){
 
 		$is_enabled = R::findOne('channels','channel = ?', array($channel));
 		if(!$is_enabled){
-			$response = 'This is not a timedude channel!';
+			$response = 'This is not a timedude channel! This was your original message, put it where it belongs: '.$_POST['text'];
 			$error = true;
 		}else{
 
 			$args = explode(' ', $params);
-	
+			
 			# which date?
 			if(strtolower($args[0]) === 'yesterday'){
+				$unit = 'hours';
 				$date_to_add = date('Y-m-d', strtotime('yesterday'));
 				array_shift($args); #remove the word yesterday
 			}else if(seems_to_be_date($args[0])){
+				$unit = 'hours';
 				$date_to_add = $args[0];
 				array_shift($args); #remove the word containing the specific date
+			}else if(strtolower($args[0]) === 'cost'){
+				$unit = 'cost';
+				$date_to_add = date('Y-m-d');
+				array_shift($args); #remove the word cost
 			}else{
+				$unit = 'hours';
 				$date_to_add = date('Y-m-d'); #today
 			}
 	
 			$args[0] = trim($args[0],'h');
-			if($hours = floatval($args[0])){
-				array_shift($args); #remove first word, contains the hours-value
+			if($unitvalue = floatval($args[0])){
+				array_shift($args); #remove first word, contains the hours/cost-value
 				if(strlen($args[0]) > 2){
 					$times = R::dispense('times');
 					$times->channel = $channel;
 					$times->user = $user;
-					$times->hours = $hours;
+					if($unit === 'cost'){
+						$times->cost = $unitvalue;
+						$times->hours = 0;
+					}else{
+						$times->cost = NULL;
+						$times->hours = $unitvalue;
+					}
 					$times->description = implode($args, ' ');
 					$times->created_at = $date_to_add;
 					R::store($times);
-					$response = 'Added '.$hours.'h to this project for '.$date_to_add.' '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";
+					if($unit === 'cost'){
+						$response = 'Added '.$unitvalue.'SEK as a cost to this project for '.$date_to_add.' '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";
+					}else{
+						$response = 'Added '.$unitvalue.'h to this project for '.$date_to_add.' '.random_emoji()."\nType clear if you wish to remove this entire day from your reports.";	
+					}
+
 				}else{
 					$response = 'You need to provide some kind of description, like 8h haxxing';
 					$error = true;
@@ -130,7 +148,7 @@ if($_POST['channel_name'] === 'directmessage' || $_POST['channel_name'] === ''){
 			$limit = 100;
 		}
 
-		$old_times = R::findAll('times',' user = ? AND channel = ? ORDER BY created_at ASC LIMIT '.$limit, array($user, $channel));
+		$old_times = R::findAll('times',' user = ? AND channel = ? ORDER BY created_at DESC LIMIT '.$limit, array($user, $channel));
 		if($old_times){
 			foreach($old_times as $old_time){
 				$response .= $old_time->created_at;
@@ -140,6 +158,8 @@ if($_POST['channel_name'] === 'directmessage' || $_POST['channel_name'] === ''){
 				$response .= $old_time->description;
 				$response .= "\n";
 			}
+			$response .= "\n\n";
+			$response .= "http://miscbox.earthpeople.se/timedude/usercal/?uid=".md5($user);
 		}else{
 			$response = 'Nothing, nada, etc';
 			$error = true;
@@ -150,10 +170,10 @@ if($_POST['channel_name'] === 'directmessage' || $_POST['channel_name'] === ''){
 		if((int)$params > 0){
 			$limit = $params;
 		}else{
-			$limit = 100;
+			$limit = 50;
 		}
 
-		$old_times = R::findAll('times',' channel = ? ORDER BY created_at ASC LIMIT '.$limit, array($channel));
+		$old_times = R::findAll('times',' channel = ? ORDER BY created_at DESC LIMIT '.$limit, array($channel));
 		if($old_times){
 			foreach($old_times as $old_time){
 				$response .= $old_time->created_at;
@@ -232,6 +252,7 @@ function help(){
 	$str = "Available commands in a channel:\n";
 	$str .= "add <HOURS> i made a funny gif\n";
 	$str .= "add ".date('Y-m-d', strtotime('yesterday'))." <HOURS> i made a funny gif\n";
+	$str .= "add cost 5000 hosting for nice website (amount in SEK pls)\n";
 	$str .= "clear (will clear your hours in this project for today)\n";
 	$str .= "export (generates a csv of the entire project)\n";
 	$str .= "list (shows your reported stuff for this project)\n";
